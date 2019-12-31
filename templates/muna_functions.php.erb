@@ -1,0 +1,21 @@
+<?php
+# Managed by Puppet
+define('WEBROOT_PATH', '<%= @webroot_path %>');
+define('SSL_PATH', '<%= @ssl_path %>');
+define('NAMESPACE_CONFIG_PATH', '/opt/muna/conf/namespaces.ini');
+define('SSL_CONFIG_PATH', '/opt/muna/conf/ssl_%s.ini');
+
+function output($message) {
+    echo $message.PHP_EOL;
+}
+
+function quit($message, $code = 0) {
+    output($message);
+    exit($code);
+}
+
+<% if @http_proxy %>putenv('http_proxy=<%= @http_proxy %>');<% end %>
+<% if @https_proxy %>putenv('https_proxy=<%= @https_proxy %>');<% end %>
+<% if @aws_key %>putenv('AWS_ACCESS_KEY_ID=<%= @aws_key %>');<% end %>
+<% if @aws_secret %>putenv('AWS_SECRET_ACCESS_KEY=<%= @aws_secret %>');<% end %>
+<% if @aws_region %>putenv('AWS_REGION=<%= @aws_region %>');<% end %>

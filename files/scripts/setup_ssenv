@@ -1,0 +1,77 @@
+#!/usr/bin/env php
+<?php
+
+include __DIR__.'/_muna_functions.php';
+
+if(empty($argv[1])) {
+    quit("vhost must be passed as the first argument", 2);
+}
+$vhost = $argv[1];
+
+if(!file_exists(NAMESPACE_CONFIG_PATH)) {
+    quit(sprintf("Muna config file '%s' is missing", NAMESPACE_CONFIG_PATH));
+}
+
+$namespaces = parse_ini_file(NAMESPACE_CONFIG_PATH, true);
+if(!is_array($namespaces) || empty($namespaces)) {
+    quit("No namespaces configured in namespaces.ini");
+}
+
+$configId = 40;
+foreach($namespaces as $vault => $vaultKeys) {
+    $newEnvFile = sprintf('%s/%s/_ss_environment_secrets_%s.php', WEBROOT_PATH, $vhost, $vault);
+    $newConfFile = sprintf('/etc/platform-variables/%s/%d-secrets-%s.conf', $vhost, $configId, $vault);
+    $newApacheConfFile = sprintf('/etc/apache2/platform-variables/%s/%d-secrets-%s.conf', $vhost, $configId, $vault);
+
+    // Use a temporary PHP environment file to ensure busy sites don't try to load the file before the permissions are fixed 
+    $tempEnvFile = sprintf('%s__tmp', $newEnvFile);
+
+    if (isset($vaultKeys['vhost']) && $vaultKeys['vhost']) {
+        $path = sprintf('%s/%s/ssenv', $vaultKeys["path"], $vhost);
+    } else {
+        $path = sprintf('%s/ssenv', $vaultKeys["path"]);
+    }
+
+    output(sprintf("Processing environment variables for namespace '%s'", $path));
+    $command = [
+        '/opt/muna/bin/muna export',
+        escapeshellarg($path),
+        '--format php',
+        '--output',
+        escapeshellarg($tempEnvFile),
+        '--format dotenv',
+        '--output',
+        escapeshellarg($newConfFile),
+        '--format apache',
+        '--output',
+        escapeshellarg($newApacheConfFile),
+    ];
+
+    $ret = exec(implode(' ', $command), $returnOutput, $exitCode);
+
+    if($exitCode != 0) {
+        quit(sprintf(
+            "Unable to download path '%s' for '%s'. Exit code: '%s'",
+            $path,
+            $vhost,
+            $exitCode
+        ), $exitCode);
+    }
+
+    // Copy over the new PHP file to the new location once permissions are correct
+    chown($tempEnvFile, 'www-data');
+    chgrp($tempEnvFile, 'www-data');
+    rename($tempEnvFile, $newEnvFile);
+
+    // Set file and ownership permissions
+    chown($newConfFile, 'root');
+    chown($newApacheConfFile, 'root');
+    chgrp($newConfFile, 'root');
+    chgrp($newApacheConfFile, 'root');
+    chmod($newConfFile, 0600);
+    chmod($newApacheConfFile, 0600);
+
+    $configId++;
+}
+
+output(sprintf("Environment variables configured for '%s'", $vhost));

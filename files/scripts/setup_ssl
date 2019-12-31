@@ -1,0 +1,85 @@
+#!/usr/bin/php
+<?php
+
+include __DIR__.'/_muna_functions.php';
+
+if(empty($argv[1])) {
+    quit("vhost must be passed as the first argument", 2);
+}
+$vhost = $argv[1];
+
+$iniFile = sprintf(SSL_CONFIG_PATH, $vhost);
+if(!file_exists($iniFile)) {
+    quit(sprintf("No SSL configuration ini file found for '%s', skipping", $vhost));
+}
+
+$ssl = parse_ini_file($iniFile);
+if(!is_array($ssl)) {
+    quit(sprintf("Invalid SSL ini file format for '%s'", $vhost), 2);
+}
+
+// If either of the key or cert is not set, then don't set any.
+if(!isset($ssl['key_key']) || !isset($ssl['cert_key'])) {
+    quit(sprintf("SSL certificate or key entry not found in the ini file for '%s'", $vhost),2);
+}
+
+// Ensure at least the defaults are set
+if(!isset($ssl['key_namespace'])) $ssl['key_namespace'] = 'env';
+if(!isset($ssl['cert_namespace'])) $ssl['cert_namespace'] = 'env';
+
+if(!file_exists(NAMESPACE_CONFIG_PATH)) {
+    quit(sprintf("Muna config file '%s' is missing", NAMESPACE_CONFIG_PATH));
+}
+
+$namespaces = parse_ini_file(NAMESPACE_CONFIG_PATH, true);
+if(!is_array($namespaces) || empty($namespaces)) {
+    quit("SSL configuration required, but no namespaces configured in namespaces.ini");
+}
+
+if(!isset($namespaces[$ssl['key_namespace']])) {
+    quit(sprintf("Invalid key namespace - skipping SSL configuration for vhost '%s'", $vhost), 2);
+}
+
+if(!isset($namespaces[$ssl['cert_namespace']])) {
+    quit(sprintf("Invalid cert namespace - skipping SSL configuration for vhost '%s'", $vhost), 2);
+}
+
+$paths = [
+    sprintf('%s/%s', $namespaces[$ssl['cert_namespace']]["path"], $ssl['cert_key']),
+    sprintf('%s/%s', $namespaces[$ssl['key_namespace']]["path"], $ssl['key_key']),
+];
+
+// Download each path from Muna into a temporary directory
+$sslTemporaryPath = sprintf("%s/muna_tmp_%s", sys_get_temp_dir(), uniqid());
+mkdir($sslTemporaryPath);
+foreach ($paths as $path) {
+    output(sprintf("Processing path '%s'", $path));
+
+    $ret = exec(sprintf('/opt/muna/bin/muna export %s --as-files --output %s',
+        escapeshellarg($path),
+        $sslTemporaryPath
+    ), $sslKey, $exitCode);
+
+    if($exitCode != 0) {
+        quit(sprintf(
+            "Unable to download path '%s' for '%s'. Exit code: '%s'",
+            $path,
+            $vhost,
+            $exitCode
+        ), $exitCode);
+    }
+}
+
+// Move files out of the temporary directory and into the nginx SSL directory
+$directory = glob(sprintf("%s/*", $sslTemporaryPath));
+foreach($directory as $file) {
+    $ext = pathinfo($file, PATHINFO_EXTENSION);
+    $newFile = sprintf('%s/%s.%s', SSL_PATH, $vhost, $ext);
+    output(sprintf("Moving file '%s' to '%s'", $file, $newFile));
+    rename($file, $newFile);
+}
+
+// Delete the temporary directory
+exec(sprintf('rm -rf %s', escapeshellarg($sslTemporaryPath)));
+
+output(sprintf("SSL configured for '%s'", $vhost));
