@@ -9,14 +9,19 @@ class muna::install inherits muna {
 		ensure => directory,
 		owner => 'root',
 		group => 'root',
-		mode => '0750',
+		mode => '0700',
 	}
 
 	# Install the main Muna binary
+	$proxy_environment = []
+	if $http_proxy {
+		$proxy_environment = ["http_proxy=${http_proxy}", "https_proxy=${https_proxy}"]
+	}
+
 	exec { "muna_download":
 		command => "wget -q ${download_link} -O /opt/muna/bin/muna",
 		path => '/usr/bin:/usr/sbin:/bin',
-		environment => ["https_proxy=${https_proxy}","http_proxy=${http_proxy}"],
+		environment => $proxy_environment,
 		onlyif => "test ! -f /opt/muna/bin/muna"
 	}
 
@@ -24,7 +29,7 @@ class muna::install inherits muna {
 		ensure => file,
 		owner => "root",
 		group => "root",
-		mode => "0744"
+		mode => "0700"
 	}
 
 	file { "/opt/muna/scripts":
@@ -32,7 +37,7 @@ class muna::install inherits muna {
 		ensure => directory,
 		owner => "root",
 		group => "root",
-		mode => "0700",
+		mode => "0740",
 		source => "puppet:///modules/muna/scripts",
 		recurse => true
 	}

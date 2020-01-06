@@ -15,7 +15,7 @@ The module supports three types of secrets, which are a holdover from the legacy
 
 ## Namespaces
 
-The module allows for the configuration of namespaces, which are paths used to store secrets in when using Parameter Store, for example environment, stack, cluster, and global namespaces. These are stored in `/etc/muna/namespaces.ini`, and are populated by Rainforest during the manifest compilation (for the cluster, stack, and env codes) and the Puppet run.
+The module allows for the configuration of namespaces, which are paths used to store secrets in when using Parameter Store, for example environment, stack, cluster, and global namespaces. These are stored in `/opt/muna/conf/namespaces.ini`, and are populated by Rainforest during the manifest compilation (for the cluster, stack, and env codes) and the Puppet run.
 
 Each namespace has a `vhost` flag to work out whether the vault is segmented for each vhost on the environment. For example, it makes sense to have vhost-specific environment and stack secrets but vhost-specific ones in the account namespace.
 
