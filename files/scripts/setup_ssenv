@@ -61,6 +61,7 @@ foreach($namespaces as $vault => $vaultKeys) {
     // Copy over the new PHP file to the new location once permissions are correct
     chown($tempEnvFile, 'www-data');
     chgrp($tempEnvFile, 'www-data');
+    chmod($tempEnvFile, 0640);
     rename($tempEnvFile, $newEnvFile);
 
     // Set file and ownership permissions
@@ -68,8 +69,8 @@ foreach($namespaces as $vault => $vaultKeys) {
     chown($newApacheConfFile, 'root');
     chgrp($newConfFile, 'root');
     chgrp($newApacheConfFile, 'root');
-    chmod($newConfFile, 0600);
-    chmod($newApacheConfFile, 0600);
+    chmod($newConfFile, 0640);
+    chmod($newApacheConfFile, 0640);
 
     $configId++;
 }
