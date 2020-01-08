@@ -13,9 +13,10 @@ class muna::install inherits muna {
 	}
 
 	# Install the main Muna binary
-	$proxy_environment = []
 	if $http_proxy {
 		$proxy_environment = ["http_proxy=${http_proxy}", "https_proxy=${https_proxy}"]
+	} else {
+		$proxy_environment = []
 	}
 
 	exec { "muna_download":
