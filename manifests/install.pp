@@ -9,7 +9,7 @@ class muna::install inherits muna {
 		ensure => directory,
 		owner => 'root',
 		group => 'root',
-		mode => '0700',
+		mode => '0755',
 	}
 
 	# Install the main Muna binary
@@ -30,7 +30,7 @@ class muna::install inherits muna {
 		ensure => file,
 		owner => "root",
 		group => "root",
-		mode => "0700"
+		mode => "0555"
 	}
 
 	file { "/opt/muna/scripts":
@@ -38,7 +38,7 @@ class muna::install inherits muna {
 		ensure => directory,
 		owner => "root",
 		group => "root",
-		mode => "0740",
+		mode => "755",
 		source => "puppet:///modules/muna/scripts",
 		recurse => true
 	}

@@ -12,7 +12,7 @@ class muna::config inherits muna {
 		ensure => file,
 		owner => "root",
 		group => "root",
-		mode => "0640",
+		mode => "0600",
 		require => File['/opt/muna/conf'],
 	}
 }

@@ -8,7 +8,7 @@ define muna::sslcert(
 		ensure => file,
 		owner => "root",
 		group => "root",
-		mode => "0640",
+		mode => "0600",
 		require => File['/opt/muna/conf'],
 	}
   ini_setting { "/opt/muna/conf/ssl_${name}.ini cert_key":
