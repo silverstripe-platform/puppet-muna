@@ -20,7 +20,7 @@ class muna::install inherits muna {
 	}
 
 	exec { "muna_download":
-		command => "wget -q ${download_link} -O /opt/muna/bin/muna",
+		command => "curl -f ${download_link} -o /opt/muna/bin/muna",
 		path => '/usr/bin:/usr/sbin:/bin',
 		environment => $proxy_environment,
 		onlyif => "test ! -f /opt/muna/bin/muna"
@@ -41,16 +41,5 @@ class muna::install inherits muna {
 		mode => "755",
 		source => "puppet:///modules/muna/scripts",
 		recurse => true
-	}
-
-	if $cron_enabled {
-		# Set up cron for pulling in secrets automatically if required
-		file { "/etc/cron.d/muna-update-secrets":
-			ensure => file,
-			owner => "root",
-			group => "root",
-			mode => "0644",
-			content => "${cron_minute} ${cron_hour} * * * root /opt/muna/scripts/provision.sh ${environmentname} | logger -t muna\n",
-		}
 	}
 }

@@ -18,7 +18,3 @@ The module supports three types of secrets, which are a holdover from the legacy
 The module allows for the configuration of namespaces, which are paths used to store secrets in when using Parameter Store, for example environment, stack, cluster, and global namespaces. These are stored in `/opt/muna/conf/namespaces.ini`, and are populated by Rainforest during the manifest compilation (for the cluster, stack, and env codes) and the Puppet run.
 
 Each namespace has a `vhost` flag to work out whether the vault is segmented for each vhost on the environment. For example, it makes sense to have vhost-specific environment and stack secrets but vhost-specific ones in the account namespace.
-
-## Auto-refresh
-
-If enabled, auto-refresh will reprovision the SSL certificates every hour. This can be used by the likes of Lets Encrypt if the certificate is replaced in the environment namespace and uses the same key.
