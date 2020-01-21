@@ -20,17 +20,19 @@ class muna::install inherits muna {
 	}
 
 	exec { "muna_download":
-		command => "curl -f ${download_link} -o /opt/muna/bin/muna",
+		command => "curl -s -f ${download_link} -o /opt/muna/bin/muna",
 		path => '/usr/bin:/usr/sbin:/bin',
 		environment => $proxy_environment,
-		onlyif => "test ! -f /opt/muna/bin/muna"
+		onlyif => "test ! -f /opt/muna/bin/muna",
+		require => File["/opt/muna/bin"]
 	}
 
 	file { '/opt/muna/bin/muna':
 		ensure => file,
 		owner => "root",
 		group => "root",
-		mode => "0555"
+		mode => "0555",
+		require => Exec["muna_download"]
 	}
 
 	file { "/opt/muna/scripts":
