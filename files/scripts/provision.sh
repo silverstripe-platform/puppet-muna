@@ -7,6 +7,11 @@ if [ "${NAMESPACE}" == "" ]; then
     exit 1
 fi
 
+if [ ! -f "/opt/muna/.enabled" ]; then
+    echo "Muna not enabled, exiting"
+    exit 1
+fi
+
 /opt/muna/scripts/setup_ssenv "${NAMESPACE}"
 /opt/muna/scripts/setup_secrets "${NAMESPACE}"
 /opt/muna/scripts/setup_ssl "${NAMESPACE}"
