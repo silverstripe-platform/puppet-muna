@@ -24,4 +24,12 @@ putenv('HTTPS_PROXY=<%= @https_proxy %>');
 <% end %>
 <% if @aws_key %>putenv('AWS_ACCESS_KEY_ID=<%= @aws_key %>');<% end %>
 <% if @aws_secret %>putenv('AWS_SECRET_ACCESS_KEY=<%= @aws_secret %>');<% end %>
-<% if @aws_region %>putenv('AWS_REGION=<%= @aws_region %>');<% end %>
+<% if @aws_region %>
+putenv('AWS_REGION=<%= @aws_region %>');
+<% else %>
+if (!empty($argv[2])) {
+	// Muna will not automatically pick this up from the PHP process
+	putenv('AWS_REGION='.$argv[2]);
+}
+<% end %>
+

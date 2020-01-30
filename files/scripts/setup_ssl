@@ -55,17 +55,19 @@ mkdir($sslTemporaryPath);
 foreach ($paths as $path) {
     output(sprintf("Processing path '%s'", $path));
 
-    $ret = exec(sprintf('/opt/muna/bin/muna export %s --as-files --output %s',
+    $ret = exec(sprintf('/opt/muna/bin/muna export %s --region %s --as-files --output %s',
         escapeshellarg($path),
+        escapeshellarg(getenv('AWS_REGION')),
         $sslTemporaryPath
     ), $sslKey, $exitCode);
 
     if($exitCode != 0) {
         quit(sprintf(
-            "Unable to download path '%s' for '%s'. Exit code: '%s'",
+            "Unable to download path '%s' for '%s'. Exit code: '%s', response: %s",
             $path,
             $vhost,
-            $exitCode
+            $exitCode,
+            $ret
         ), $exitCode);
     }
 }
