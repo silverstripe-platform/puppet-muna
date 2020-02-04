@@ -6,7 +6,7 @@ include __DIR__.'/_muna_functions.php';
 if(empty($argv[1])) {
     quit("vhost must be passed as the first argument", 2);
 }
-$vhost = $argv[1];
+$vhost = str_replace('-prod', '', $argv[1]);
 
 $iniFile = sprintf(SSL_CONFIG_PATH, $vhost);
 if(!file_exists($iniFile)) {

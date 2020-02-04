@@ -6,7 +6,7 @@ include __DIR__.'/_muna_functions.php';
 if(empty($argv[1])) {
     quit("vhost must be passed as the first argument", 2);
 }
-$vhost = $argv[1];
+$vhost = str_replace('-prod', '', $argv[1]);
 
 if(!file_exists(NAMESPACE_CONFIG_PATH)) {
     quit(sprintf("Muna config file '%s' is missing", NAMESPACE_CONFIG_PATH));
