@@ -35,13 +35,13 @@ class muna::install inherits muna {
 		require => Exec["muna_download"]
 	}
 
-	file { "/opt/muna/scripts":
-		path => "/opt/muna/scripts",
+	file { "/opt/muna/scripts/":
+		path => "/opt/muna/scripts/",
 		ensure => directory,
 		owner => "root",
 		group => "root",
 		mode => "755",
-		source => "puppet:///modules/muna/scripts",
+		source => "puppet:///modules/muna/scripts/",
 		recurse => true
 	}
 }
