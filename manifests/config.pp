@@ -14,7 +14,7 @@ class muna::config inherits muna {
 		group => "root",
 		mode => "0600",
 		content => template("muna/muna_functions.php.erb"),
-		require => File['/opt/muna/scripts'],
+		require => File['/opt/muna/scripts/'],
 	}
 	
   file { "/opt/muna/conf/namespaces.ini":
