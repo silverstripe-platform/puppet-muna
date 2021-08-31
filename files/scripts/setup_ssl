@@ -50,7 +50,7 @@ $paths = [
 ];
 
 // Download each path from Muna into a temporary directory
-$sslTemporaryPath = sprintf("%s/muna_tmp_%s", sys_get_temp_dir(), uniqid());
+$sslTemporaryPath = sprintf("%s/muna_tmp_%s", sys_get_temp_dir(), uniqid($vhost));
 mkdir($sslTemporaryPath);
 foreach ($paths as $path) {
     output(sprintf("Processing path '%s'", $path));

@@ -17,8 +17,8 @@ fi
 systemctl reload apache2
 
 # Only try to setup SSL and reload nginx if it is installed and running
-if [ systemctl is-active --quiet nginx ]; then
+if [[ $(systemctl is-active --quiet nginx) -eq 0 ]]; then
     # Install SSL Certificates and reload Nginx
     /opt/muna/scripts/setup_ssl "${NAMESPACE}"
-    systemctl reload nginx
+    nginx -t && systemctl reload nginx
 fi
