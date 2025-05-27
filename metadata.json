@@ -4,6 +4,6 @@
     "author": "Silverstripe Ltd",
     "license": "BSD-3-Clause",
     "summary": "Package for interacting with the Muna vault",
-    "source": "https://github.com/silverstripeltd/puppet-muna",
+    "source": "https://github.com/silverstripe-platform/puppet-muna",
     "dependencies": []
 }
