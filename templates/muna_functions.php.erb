@@ -14,6 +14,34 @@ function quit($message, $code = 0) {
     exit($code);
 }
 
+function get_region_v2() {
+    $ch = curl_init();
+
+    // Get metadata V2
+    $headers = array (
+            'X-aws-ec2-metadata-token-ttl-seconds: 10' );
+    $url = "http://169.254.169.254/latest/api/token";
+    curl_setopt( $ch, CURLOPT_URL, $url );
+    curl_setopt( $ch, CURLOPT_HTTPHEADER, $headers );
+    curl_setopt( $ch, CURLOPT_RETURNTRANSFER, true );
+    curl_setopt( $ch, CURLOPT_CUSTOMREQUEST, "PUT" );
+    curl_setopt( $ch, CURLOPT_URL, $url );
+    $token = curl_exec( $ch );
+
+    // Get region from metadata 
+    $headers = array (
+            'X-aws-ec2-metadata-token: '.$token );
+    $url = "http://169.254.169.254/latest/meta-data/placement/region";
+
+    curl_setopt( $ch, CURLOPT_URL, $url );
+    curl_setopt( $ch, CURLOPT_HTTPHEADER, $headers );
+    curl_setopt( $ch, CURLOPT_RETURNTRANSFER, true );
+    curl_setopt( $ch, CURLOPT_CUSTOMREQUEST, "GET" );
+    $result = curl_exec( $ch );
+
+    return $result;
+}
+
 <% if @http_proxy %>
 putenv('http_proxy=<%= @http_proxy %>');
 putenv('HTTP_PROXY=<%= @http_proxy %>');

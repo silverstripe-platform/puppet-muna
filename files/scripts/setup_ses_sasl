@@ -1,0 +1,88 @@
+#!/usr/bin/php
+<?php
+
+include __DIR__.'/_muna_functions.php';
+
+function get_muna_hierarchy($namespaces, $key) {
+    
+    foreach ($namespaces as $namespace) {
+
+        unset ($get_key);
+        $path = sprintf('%s/%s', $namespace['path'], $key);
+        $ret = exec(sprintf('/opt/muna/bin/muna export %s --region %s',
+            escapeshellarg($path),
+            escapeshellarg(getenv('AWS_REGION')),
+        ), $get_key, $exitCode);
+
+        if($exitCode != 0) {
+            quit(sprintf(
+                "Unable to download path '%s'. Exit code: '%s', response: %s",
+                $path,
+                $exitCode,
+                $ret
+            ), $exitCode);
+        }
+
+        // Verify output:
+        // "{}" means no data
+        // Expect exactly one line
+        if (count($get_key) != 1) {
+            continue;
+        }
+
+        if ($get_key[0] != '{}') {
+            break;
+        }
+    }
+
+    return json_decode($get_key[0], true);
+}
+
+function get_value_assoc($arr, $key) {
+
+    if (! (array_key_exists($key, $arr))) {
+        return false;
+    }
+
+    return $arr[$key];
+}
+putenv('AWS_REGION='.get_region_v2());
+
+$namespaces = parse_ini_file(NAMESPACE_CONFIG_PATH, true);
+$ses_smtp = get_value_assoc(get_muna_hierarchy($namespaces, 'ses/server-name'), 'server-name');
+$ses_sasl_key = get_value_assoc(get_muna_hierarchy($namespaces, 'ses/sasl-key'), 'sasl-key');
+$ses_sasl_secret = get_value_assoc(get_muna_hierarchy($namespaces, 'ses/sasl-secret'), 'sasl-secret');
+$sasl_file = '/etc/postfix/sasl_passwd';
+
+if (!$ses_smtp || !$ses_sasl_key || !$ses_sasl_secret) {
+    quit(sprintf("No SES credentials found in Muna"), 0);
+}
+
+$sasl_file_contents = sprintf('%s %s:%s%s',
+    $ses_smtp,
+    $ses_sasl_key,
+    $ses_sasl_secret,
+    PHP_EOL,
+);
+
+if (file_put_contents($sasl_file, $sasl_file_contents)) {
+
+    output('Postfix SASL file updated');
+    $ret = exec('/usr/sbin/postmap /etc/postfix/sasl_passwd', $ses_server_name, $exitCode);
+
+    if($exitCode != 0) {
+        quit(sprintf(
+            "Unable to download path '%s'. Exit code: '%s', response: %s",
+            $path,
+            $exitCode,
+            $ret
+        ), $exitCode);
+    }
+
+    output('Postmap successfully run');
+
+} else {
+
+    quit(sprintf('Unable to write to SASL file %s', $sasl_file));
+
+}
