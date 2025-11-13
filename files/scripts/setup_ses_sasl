@@ -1,44 +1,41 @@
 #!/usr/bin/php
 <?php
-
 include __DIR__.'/_muna_functions.php';
 
-function get_muna_hierarchy($namespaces, $key) {
-    
+$namespaces = parse_ini_file(NAMESPACE_CONFIG_PATH, true);
+$aws_region = get_region_v2();
+
+function get_muna_hierarchy($namespaces, $key, $region) {
     foreach ($namespaces as $namespace) {
+        unset ($munaOutput);
+        $munaPath = sprintf('%s/%s', $namespace['path'], $key);
+        $munaCmd = sprintf(
+            '/opt/muna/bin/muna export %s --region %s',
+            escapeshellarg($munaPath),
+            $region
+        );
 
-        unset ($get_key);
-        $path = sprintf('%s/%s', $namespace['path'], $key);
-        $ret = exec(sprintf('/opt/muna/bin/muna export %s --region %s',
-            escapeshellarg($path),
-            escapeshellarg(getenv('AWS_REGION')),
-        ), $get_key, $exitCode);
+        exec($munaCmd, $munaOutput, $munaExitCode);
 
-        if($exitCode != 0) {
+        if($munaExitCode != 0) {
             quit(sprintf(
                 "Unable to download path '%s'. Exit code: '%s', response: %s",
-                $path,
-                $exitCode,
-                $ret
+                $munaPath,
+                $munaExitCode,
+                implode(PHP_EOL, $munaOutput)
             ), $exitCode);
         }
 
-        // Verify output:
-        // "{}" means no data
-        // Expect exactly one line
-        if (count($get_key) != 1) {
-            continue;
-        }
-
-        if ($get_key[0] != '{}') {
-            break;
+        // Expect exactly one line and not "{}" (means no data)
+        if (count($munaOutput) === 1 && $munaOutput[0] !== '{}') {
+            return json_decode($munaOutput[0], true);
         }
     }
 
-    return json_decode($get_key[0], true);
+    return false;
 }
 
-function get_value_assoc($arr, $key) {
+function get_value($arr, $key) {
 
     if (! (array_key_exists($key, $arr))) {
         return false;
@@ -46,12 +43,11 @@ function get_value_assoc($arr, $key) {
 
     return $arr[$key];
 }
-putenv('AWS_REGION='.get_region_v2());
 
-$namespaces = parse_ini_file(NAMESPACE_CONFIG_PATH, true);
-$ses_smtp = get_value_assoc(get_muna_hierarchy($namespaces, 'ses/server-name'), 'server-name');
-$ses_sasl_key = get_value_assoc(get_muna_hierarchy($namespaces, 'ses/sasl-key'), 'sasl-key');
-$ses_sasl_secret = get_value_assoc(get_muna_hierarchy($namespaces, 'ses/sasl-secret'), 'sasl-secret');
+$ses_smtp = get_value(get_muna_hierarchy($namespaces, 'ses/server-name', $aws_region), 'server-name');
+$ses_sasl_key = get_value(get_muna_hierarchy($namespaces, 'ses/sasl-key', $aws_region), 'sasl-key');
+$ses_sasl_secret = get_value(get_muna_hierarchy($namespaces, 'ses/sasl-secret', $aws_region), 'sasl-secret');
+
 $sasl_file = '/etc/postfix/sasl_passwd';
 
 if (!$ses_smtp || !$ses_sasl_key || !$ses_sasl_secret) {
@@ -65,24 +61,22 @@ $sasl_file_contents = sprintf('%s %s:%s%s',
     PHP_EOL,
 );
 
-if (file_put_contents($sasl_file, $sasl_file_contents)) {
-
-    output('Postfix SASL file updated');
-    $ret = exec('/usr/sbin/postmap /etc/postfix/sasl_passwd', $ses_server_name, $exitCode);
-
-    if($exitCode != 0) {
-        quit(sprintf(
-            "Unable to download path '%s'. Exit code: '%s', response: %s",
-            $path,
-            $exitCode,
-            $ret
-        ), $exitCode);
-    }
-
-    output('Postmap successfully run');
-
-} else {
-
+if (file_put_contents($sasl_file, $sasl_file_contents, LOCK_EX) === false) {
     quit(sprintf('Unable to write to SASL file %s', $sasl_file));
-
 }
+
+output('Postfix SASL file updated');
+
+$postmapCmd = '/usr/sbin/postmap /etc/postfix/sasl_passwd';
+exec($postmapCmd, $postmapOutput, $postmapExitCode);
+
+if ($postmapExitCode !== 0) {
+    quit(sprintf(
+        "postmap failed ('%s'). Exit code: %d, response: %s",
+        $postmapCmd,
+        $postmapExitCode,
+        implode(PHP_EOL, $postmapOutput)
+    ), $postmapExitCode);
+}
+
+output('Postmap successfully run');
