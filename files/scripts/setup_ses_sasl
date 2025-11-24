@@ -3,7 +3,11 @@
 include __DIR__.'/_muna_functions.php';
 
 $namespaces = parse_ini_file(NAMESPACE_CONFIG_PATH, true);
-$aws_region = get_region_v2();
+$aws_region = getenv('AWS_REGION');
+
+if (!is_region($aws_region)) {
+    quit("Quit: SES Region ENVVAR not valid");
+}
 
 function get_muna_hierarchy($namespaces, $key, $region) {
     foreach ($namespaces as $namespace) {
@@ -12,7 +16,7 @@ function get_muna_hierarchy($namespaces, $key, $region) {
         $munaCmd = sprintf(
             '/opt/muna/bin/muna export %s --region %s',
             escapeshellarg($munaPath),
-            $region
+            escapeshellarg($region)
         );
 
         exec($munaCmd, $munaOutput, $munaExitCode);
@@ -27,8 +31,8 @@ function get_muna_hierarchy($namespaces, $key, $region) {
         }
 
         // Expect exactly one line and not "{}" (means no data)
-        if (count($munaOutput) === 1 && $munaOutput[0] !== '{}') {
-            return json_decode($munaOutput[0], true);
+        if ($muna_json = json_decode($munaOutput[0], true)) {
+            return $muna_json;
         }
     }
 
@@ -44,9 +48,13 @@ function get_value($arr, $key) {
     return $arr[$key];
 }
 
-$ses_smtp = get_value(get_muna_hierarchy($namespaces, 'ses/server-name', $aws_region), 'server-name');
-$ses_sasl_key = get_value(get_muna_hierarchy($namespaces, 'ses/sasl-key', $aws_region), 'sasl-key');
-$ses_sasl_secret = get_value(get_muna_hierarchy($namespaces, 'ses/sasl-secret', $aws_region), 'sasl-secret');
+if (!$ses_config = get_muna_hierarchy($namespaces, 'ses', $aws_region)) {
+    quit("Quit: No muna data");
+};
+
+$ses_smtp = get_value($ses_config, 'server-name');
+$ses_sasl_key = get_value($ses_config, 'sasl-key');
+$ses_sasl_secret = get_value($ses_config, 'sasl-secret');
 
 $sasl_file = '/etc/postfix/sasl_passwd';
 
