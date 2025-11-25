@@ -1,0 +1,87 @@
+#!/usr/bin/php
+<?php
+include __DIR__.'/_muna_functions.php';
+
+$namespaces = parse_ini_file(NAMESPACE_CONFIG_PATH, true);
+$aws_region = getenv('AWS_REGION');
+
+if (!is_region($aws_region)) {
+    quit("Quit: SES Region ENVVAR not valid");
+}
+
+function get_muna_hierarchy($namespaces, $key, $region) {
+    foreach ($namespaces as $namespace) {
+        unset ($munaOutput);
+        $munaPath = sprintf('%s/%s', $namespace['path'], $key);
+        $munaCmd = sprintf(
+            '/opt/muna/bin/muna export %s --region %s',
+            escapeshellarg($munaPath),
+            escapeshellarg($region)
+        );
+
+        exec($munaCmd, $munaOutput, $munaExitCode);
+
+        if($munaExitCode != 0) {
+            quit(sprintf(
+                "Unable to download path '%s'. Exit code: '%s', response: %s",
+                $munaPath,
+                $munaExitCode,
+                implode(PHP_EOL, $munaOutput)
+            ), $exitCode);
+        }
+
+        return $json_decode($munaOutput[0], true);
+    }
+
+    return false;
+}
+
+function get_value($arr, $key) {
+
+    if (! (array_key_exists($key, $arr))) {
+        return false;
+    }
+
+    return $arr[$key];
+}
+
+if (!$ses_config = get_muna_hierarchy($namespaces, 'ses', $aws_region)) {
+    quit("Quit: No muna data");
+};
+
+$ses_smtp = get_value($ses_config, 'server-name');
+$ses_sasl_key = get_value($ses_config, 'sasl-key');
+$ses_sasl_secret = get_value($ses_config, 'sasl-secret');
+
+$sasl_file = '/etc/postfix/sasl_passwd';
+
+if (!$ses_smtp || !$ses_sasl_key || !$ses_sasl_secret) {
+    quit(sprintf("No SES credentials found in Muna"), 0);
+}
+
+$sasl_file_contents = sprintf('%s %s:%s%s',
+    $ses_smtp,
+    $ses_sasl_key,
+    $ses_sasl_secret,
+    PHP_EOL,
+);
+
+if (file_put_contents($sasl_file, $sasl_file_contents, LOCK_EX) === false) {
+    quit(sprintf('Unable to write to SASL file %s', $sasl_file));
+}
+
+output('Postfix SASL file updated');
+
+$postmapCmd = '/usr/sbin/postmap /etc/postfix/sasl_passwd';
+exec($postmapCmd, $postmapOutput, $postmapExitCode);
+
+if ($postmapExitCode !== 0) {
+    quit(sprintf(
+        "postmap failed ('%s'). Exit code: %d, response: %s",
+        $postmapCmd,
+        $postmapExitCode,
+        implode(PHP_EOL, $postmapOutput)
+    ), $postmapExitCode);
+}
+
+output('Postmap successfully run');
