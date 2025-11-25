@@ -30,7 +30,7 @@ function get_muna_hierarchy($namespaces, $key, $region) {
             ), $exitCode);
         }
 
-        return $json_decode($munaOutput[0], true);
+        return json_decode($munaOutput[0], true);
     }
 
     return false;
