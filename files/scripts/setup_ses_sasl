@@ -30,6 +30,11 @@ function get_muna_hierarchy($namespaces, $key, $region) {
             ), $exitCode);
         }
 
+        // Did muna return any data in this namespace?
+        if ($munaOutput[0] == '{}') {
+            continue;
+        }
+
         return json_decode($munaOutput[0], true);
     }
 
