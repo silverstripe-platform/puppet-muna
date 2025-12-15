@@ -52,7 +52,7 @@ function get_value($arr, $key) {
 
 if (!$ses_config = get_muna_hierarchy($namespaces, 'ses', $aws_region)) {
     quit("Quit: No muna data");
-};
+}
 
 $ses_smtp = get_value($ses_config, 'server-name');
 $ses_sasl_key = get_value($ses_config, 'sasl-key');
@@ -68,7 +68,7 @@ $sasl_file_contents = sprintf('%s %s:%s%s',
     $ses_smtp,
     $ses_sasl_key,
     $ses_sasl_secret,
-    PHP_EOL,
+    PHP_EOL
 );
 
 if (file_put_contents($sasl_file, $sasl_file_contents, LOCK_EX) === false) {
