@@ -1,0 +1,53 @@
+#!/bin/bash
+# Retrieves Coralogix API key from Parameter Store and updates /etc/default/vector
+# Idempotent — safe to run repeatedly. Exits gracefully if muna is not configured.
+
+set -uo pipefail
+
+source "$(dirname "$0")/_muna_functions.sh"
+
+VECTOR_ENV="/etc/default/vector"
+PARAM_PATH="coralogix/config"
+
+# Update a key=value in the vector environment file
+set_vector_env() {
+    local key="$1" value="$2"
+    if grep -q "^${key}=" "$VECTOR_ENV" 2>/dev/null; then
+        sed -i "s|^${key}=.*|${key}=${value}|" "$VECTOR_ENV"
+    else
+        echo "${key}=${value}" >> "$VECTOR_ENV"
+    fi
+}
+
+if ! require_muna; then
+    quit "Muna not available, skipping Coralogix setup"
+fi
+
+STACK_NAMESPACE=$(ini_get "stack" "path")
+if [ -z "$STACK_NAMESPACE" ]; then
+    quit "Stack namespace not found, skipping Coralogix setup"
+fi
+
+REGION=$(get_region)
+if [ -z "$REGION" ]; then
+    quit "Unable to determine region, skipping Coralogix setup"
+fi
+
+CONFIG_JSON=$("$MUNA_BIN" -r "$REGION" export "$STACK_NAMESPACE/$PARAM_PATH" 2>/dev/null || echo "")
+if [ -z "$CONFIG_JSON" ]; then
+    quit "Coralogix config not in Parameter Store, skipping"
+fi
+
+SEND_KEY=$(echo "$CONFIG_JSON" | jq -r '.config | fromjson | .private_key // empty')
+DOMAIN=$(echo "$CONFIG_JSON" | jq -r '.config | fromjson | .domain // empty')
+
+if [ -z "$SEND_KEY" ] || [ -z "$DOMAIN" ]; then
+    quit "Coralogix config incomplete, skipping"
+fi
+
+set_vector_env "CORALOGIX_SEND_KEY" "$SEND_KEY"
+set_vector_env "CORALOGIX_DOMAIN" "$DOMAIN"
+
+systemctl restart vector 2>/dev/null || true
+
+output "Coralogix configured"
