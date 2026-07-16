@@ -5,11 +5,6 @@ class muna::install inherits muna {
 		'/opt/muna/conf',
 	]
 
-	# Coralogix script has dependency on jq
-	package { 'jq':
-		ensure => present,
-	}
-
 	file { $muna_dirs:
 		ensure => directory,
 		owner => 'root',

@@ -5,6 +5,43 @@ define('SSL_PATH', '<%= @ssl_path %>');
 define('NAMESPACE_CONFIG_PATH', '/opt/muna/conf/namespaces.ini');
 define('SSL_CONFIG_PATH', '/opt/muna/conf/ssl_%s.ini');
 
+/**
+* Detect AWS region from instance metadata (IMDSv2).
+* Returns the region string or empty string on failure.
+*/
+function get_region() {
+    $tokenUrl = 'http://169.254.169.254/latest/api/token';
+    $regionUrl = 'http://169.254.169.254/latest/meta-data/placement/region';
+
+    $tokenCtx = stream_context_create([
+        'http' => [
+            'method' => 'PUT',
+            'header' => 'X-aws-ec2-metadata-token-ttl-seconds: 21600',
+            'timeout' => 2,
+        ],
+    ]);
+    $token = @file_get_contents($tokenUrl, false, $tokenCtx);
+
+    if ($token === false) {
+        return '';
+    }
+
+    $regionCtx = stream_context_create([
+        'http' => [
+            'method' => 'GET',
+            'header' => sprintf('X-aws-ec2-metadata-token: %s', $token),
+            'timeout' => 2,
+        ],
+    ]);
+
+    $region = @file_get_contents($regionUrl, false, $regionCtx);
+    if ($region === false) {
+        return '';
+    }
+
+    return trim($region);
+}
+
 function output($message) {
     echo $message.PHP_EOL;
 }
@@ -43,8 +80,10 @@ putenv('HTTPS_PROXY=<%= @https_proxy %>');
 putenv('AWS_REGION=<%= @aws_region %>');
 <% else %>
 if (!empty($argv[2])) {
-	// Muna will not automatically pick this up from the PHP process
-	putenv('AWS_REGION='.$argv[2]);
+    // Muna will not automatically pick this up from the PHP process
+    putenv('AWS_REGION='.$argv[2]);
+} else {
+    putenv('AWS_REGION='.get_region());
 }
 <% end %>
 
