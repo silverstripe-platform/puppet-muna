@@ -1,0 +1,92 @@
+#!/usr/bin/php
+<?php
+/**
+* Retrieves Coralogix API key through muna and updates /etc/default/vector
+* Safe to run repeatedly. Exits gracefully if muna is not configured.
+*/
+
+include __DIR__.'/_muna_functions.php';
+
+/**
+* Update or append key=value pair in the vector environment file.
+*/
+function set_vector_env($file, $key, $value) {
+    $line = sprintf('%s=%s', $key, $value);
+    
+    if (!file_exists($file)) {
+        file_put_contents($file, $line . PHP_EOL);
+        return;
+    }
+    
+    $contents = file_get_contents($file);
+    $pattern = sprintf('/^%s=.*$/m', preg_quote($key, '/'));
+    
+    if (preg_match($pattern, $contents)) {
+        $contents = preg_replace($pattern, $line, $contents);
+    } else {
+        $contents = rtrim($contents, PHP_EOL) . PHP_EOL . $line . PHP_EOL;
+    }
+    
+    file_put_contents($file, $contents);
+}
+
+$aws_region = getenv('AWS_REGION');
+
+if (!is_region($aws_region)) {
+    quit("Region not valid or not set, skipping Coralogix setup");
+}
+
+$vectorEnvFile = '/etc/default/vector';
+$paramPath = 'coralogix/config';
+
+if (!file_exists(NAMESPACE_CONFIG_PATH)) {
+    quit(sprintf("Muna config file '%s' is missing, skipping Coralogix setup", NAMESPACE_CONFIG_PATH));
+}
+
+$namespaces = parse_ini_file(NAMESPACE_CONFIG_PATH, true);
+if (!is_array($namespaces) || !isset($namespaces['stack']['path'])) {
+    quit("Stack namespace not found, skipping Coralogix setup");
+}
+
+$stackPath = $namespaces['stack']['path'];
+$munaPath = sprintf('%s/%s', $stackPath, $paramPath);
+
+$munaCmd = sprintf(
+    '/opt/muna/bin/muna export %s --region %s',
+    escapeshellarg($munaPath),
+    escapeshellarg($aws_region)
+);
+
+exec($munaCmd, $munaOutput, $exitCode);
+
+if ($exitCode !== 0 || empty($munaOutput[0]) || $munaOutput[0] === '{}') {
+    quit("Coralogix config not in Parameter Store, skipping");
+}
+
+$response = json_decode($munaOutput[0], true);
+if (!is_array($response) || empty($response['config'])) {
+    quit("Coralogix config not in Parameter Store, skipping");
+}
+
+$config = json_decode($response['config'], true);
+if (!is_array($config)) {
+    quit("Coralogix config incomplete, skipping");
+}
+
+$sendKey = $config['private_key'] ?? '';
+$domain = $config['domain'] ?? '';
+
+if (empty($sendKey) || empty($domain)) {
+    quit("Coralogix config incomplete, skipping");
+}
+
+set_vector_env($vectorEnvFile, 'CORALOGIX_SEND_KEY', $sendKey);
+set_vector_env($vectorEnvFile, 'CORALOGIX_DOMAIN', $domain);
+
+exec('systemctl reload vector 2>/dev/null', $_, $restartExit);
+
+if ($restartExit === 0) {
+    output("Coralogix configured");
+} else {
+    output("Error: vector reload failed");
+}
