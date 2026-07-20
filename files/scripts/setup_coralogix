@@ -1,34 +1,15 @@
 #!/usr/bin/php
 <?php
 /**
-* Retrieves Coralogix API key through muna and updates /etc/default/vector
-* Safe to run repeatedly. Exits gracefully if muna is not configured.
-*/
+ * Retrieves Coralogix credentials through muna and writes them to a JSON
+ * secrets file for consumption by the Vector activation script.
+ *
+ * Output: /etc/vector/secrets/coralogix.json
+ *
+ * Safe to run repeatedly. Exits gracefully if muna is not configured.
+ */
 
 include __DIR__.'/_muna_functions.php';
-
-/**
-* Update or append key=value pair in the vector environment file.
-*/
-function set_vector_env($file, $key, $value) {
-    $line = sprintf('%s=%s', $key, $value);
-    
-    if (!file_exists($file)) {
-        file_put_contents($file, $line . PHP_EOL);
-        return;
-    }
-    
-    $contents = file_get_contents($file);
-    $pattern = sprintf('/^%s=.*$/m', preg_quote($key, '/'));
-    
-    if (preg_match($pattern, $contents)) {
-        $contents = preg_replace($pattern, $line, $contents);
-    } else {
-        $contents = rtrim($contents, PHP_EOL) . PHP_EOL . $line . PHP_EOL;
-    }
-    
-    file_put_contents($file, $contents);
-}
 
 $aws_region = getenv('AWS_REGION');
 
@@ -36,7 +17,8 @@ if (!is_region($aws_region)) {
     quit("Region not valid or not set, skipping Coralogix setup");
 }
 
-$vectorEnvFile = '/etc/default/vector';
+$secretsDir = '/etc/vector/secrets';
+$secretsFile = $secretsDir.'/coralogix.json';
 $paramPath = 'coralogix/config';
 
 if (!file_exists(NAMESPACE_CONFIG_PATH)) {
@@ -80,13 +62,17 @@ if (empty($sendKey) || empty($domain)) {
     quit("Coralogix config incomplete, skipping");
 }
 
-set_vector_env($vectorEnvFile, 'CORALOGIX_SEND_KEY', $sendKey);
-set_vector_env($vectorEnvFile, 'CORALOGIX_DOMAIN', $domain);
-
-exec('systemctl reload vector 2>/dev/null', $_, $restartExit);
-
-if ($restartExit === 0) {
-    output("Coralogix configured");
-} else {
-    output("Error: vector reload failed");
+// Ensure secrets directory exists
+if (!is_dir($secretsDir)) {
+    mkdir($secretsDir, 0750, true);
 }
+
+$secrets = json_encode([
+    'domain'   => $domain,
+    'send_key' => $sendKey,
+], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES).PHP_EOL;
+
+file_put_contents($secretsFile, $secrets);
+chmod($secretsFile, 0640);
+
+output("Coralogix credentials written to $secretsFile");
