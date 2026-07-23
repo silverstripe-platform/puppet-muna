@@ -25,42 +25,71 @@ if (!file_exists(NAMESPACE_CONFIG_PATH)) {
     quit(sprintf("Muna config file '%s' is missing, skipping Coralogix setup", NAMESPACE_CONFIG_PATH));
 }
 
+/**
+ * Fetch and validate Coralogix config from a namespace path.
+ * Returns ['private_key' => ..., 'domain' => ...] or null if not found/invalid.
+ */
+function fetch_coralogix_config($namespacePath, $paramPath, $region) {
+    $munaPath = sprintf('%s/%s', $namespacePath, $paramPath);
+    $munaCmd = sprintf(
+        '/opt/muna/bin/muna export %s --region %s',
+        escapeshellarg($munaPath),
+        escapeshellarg($region)
+    );
+
+    exec($munaCmd, $munaOutput, $exitCode);
+
+    if ($exitCode !== 0 || empty($munaOutput[0]) || $munaOutput[0] === '{}') {
+        return null;
+    }
+
+    $response = json_decode($munaOutput[0], true);
+    if (!is_array($response) || empty($response['config'])) {
+        return null;
+    }
+
+    $decoded = json_decode($response['config'], true);
+    if (!is_array($decoded)) {
+        return null;
+    }
+
+    $sendKey = $decoded['private_key'] ?? '';
+    $domain = $decoded['domain'] ?? '';
+
+    if (empty($sendKey) || empty($domain)) {
+        return null;
+    }
+
+    return ['private_key' => $sendKey, 'domain' => $domain];
+}
+
 $namespaces = parse_ini_file(NAMESPACE_CONFIG_PATH, true);
-if (!is_array($namespaces) || !isset($namespaces['stack']['path'])) {
-    quit("Stack namespace not found, skipping Coralogix setup");
+if (!is_array($namespaces) || empty($namespaces)) {
+    quit("No namespaces configured, skipping Coralogix setup");
 }
 
-$stackPath = $namespaces['stack']['path'];
-$munaPath = sprintf('%s/%s', $stackPath, $paramPath);
+// Check namespaces in priority order: stack > cluster > account
+$hierarchy = ['stack', 'cluster', 'account'];
+$config = null;
 
-$munaCmd = sprintf(
-    '/opt/muna/bin/muna export %s --region %s',
-    escapeshellarg($munaPath),
-    escapeshellarg($aws_region)
-);
+foreach ($hierarchy as $ns) {
+    if (!isset($namespaces[$ns]['path'])) {
+        continue;
+    }
 
-exec($munaCmd, $munaOutput, $exitCode);
-
-if ($exitCode !== 0 || empty($munaOutput[0]) || $munaOutput[0] === '{}') {
-    quit("Coralogix config not in Parameter Store, skipping");
+    $config = fetch_coralogix_config($namespaces[$ns]['path'], $paramPath, $aws_region);
+    if ($config !== null) {
+        output(sprintf("Coralogix config found in '%s' namespace", $ns));
+        break;
+    }
 }
 
-$response = json_decode($munaOutput[0], true);
-if (!is_array($response) || empty($response['config'])) {
-    quit("Coralogix config not in Parameter Store, skipping");
+if ($config === null) {
+    quit("Coralogix config not found in any namespace, skipping");
 }
 
-$config = json_decode($response['config'], true);
-if (!is_array($config)) {
-    quit("Coralogix config incomplete, skipping");
-}
-
-$sendKey = $config['private_key'] ?? '';
-$domain = $config['domain'] ?? '';
-
-if (empty($sendKey) || empty($domain)) {
-    quit("Coralogix config incomplete, skipping");
-}
+$sendKey = $config['private_key'];
+$domain = $config['domain'];
 
 // Ensure secrets directory exists
 if (!is_dir($secretsDir)) {
