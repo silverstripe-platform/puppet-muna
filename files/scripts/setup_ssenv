@@ -70,7 +70,7 @@ foreach($namespaces as $vault => $vaultKeys) {
     // Set file and ownership permissions
     chown($newConfFile, 'root');
     chown($newApacheConfFile, 'root');
-    chgrp($newConfFile, 'root');
+    chgrp($newConfFile, 'www-data');
     chgrp($newApacheConfFile, 'root');
     chmod($newConfFile, 0640);
     chmod($newApacheConfFile, 0640);
